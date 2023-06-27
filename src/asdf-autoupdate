@@ -1,0 +1,66 @@
+#!/bin/bash
+
+SCRIPT_PATH="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+CRON_EXPRESSION="0 0 * * *"
+LOCK_FILE="$SCRIPT_PATH/asdf-autoupdate.lock"
+
+start_autoupdate() {
+  cron="$1"
+
+  if [ -z "$cron" ]; then
+    cron="$CRON_EXPRESSION"
+  fi
+
+  if [ -e "$LOCK_FILE" ]; then
+    echo "Autoupdate is already running."
+    exit 1
+  fi
+
+  echo "$cron $SCRIPT_PATH/asdf-autoupdate.sh" | crontab -
+  touch "$LOCK_FILE"
+
+  echo "Autoupdate started. Cron expression: $cron"
+}
+
+stop_autoupdate() {
+  if [ ! -e "$LOCK_FILE" ]; then
+    echo "Autoupdate is not running."
+    exit 1
+  fi
+
+  crontab -l | grep -v "$SCRIPT_PATH/asdf-autoupdate.sh" | crontab -
+  rm "$LOCK_FILE"
+
+  echo "Autoupdate stopped."
+}
+
+print_status() {
+  if [ -e "$LOCK_FILE" ]; then
+    echo "Autoupdate is running."
+  else
+    echo "Autoupdate is not running."
+  fi
+}
+
+subcommand="$1"
+
+case "$subcommand" in
+  "start")
+    cron="$2"
+    start_autoupdate "$cron"
+    ;;
+  "stop")
+    stop_autoupdate
+    ;;
+  "status")
+    print_status
+    ;;
+  *)
+    echo "Usage: asdf-autoupdate subcommand [cron]"
+    echo "Subcommands:"
+    echo "  start [cron]: Start autoupdating at the specified cron interval."
+    echo "  stop: Stop autoupdating."
+    echo "  status: Print the current status of this tool."
+    exit 1
+    ;;
+esac
